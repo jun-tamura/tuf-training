@@ -78,6 +78,10 @@ sudo timedatectl set-timezone Asia/Tokyo
 sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
 systemctl restart sshd
 
+### expectパッケージインストール
+### mkpasswdを使用する為
+sudo yum -y install expect
+
 ### ansibleユーザ作成&SSHキー設定
 echo "ansible" > passtemp.txt
 sudo useradd -p `cat passtemp.txt | sudo mkpasswd -s -m sha-512` ansible

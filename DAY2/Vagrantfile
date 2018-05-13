@@ -78,18 +78,15 @@ sudo timedatectl set-timezone Asia/Tokyo
 sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
 systemctl restart sshd
 
-### expectパッケージインストール
-### mkpasswdを使用する為
-sudo yum -y install expect
-
 ### ansibleユーザ作成&SSHキー設定
+ANSIBLE_HOME=/home/ansible
 echo "ansible" > passtemp.txt
 python -c "import crypt, getpass, pwd; print crypt.crypt('`cat passtemp.txt`','\$6\$salt1234\$')" > passtemp.txt
 sudo useradd -p `cat passtemp.txt` ansible
-sudo -u ansible mkdir ${HOME}/.ssh
-sudo -u ansible chmod 700 ${HOME}/.ssh
-sudo -u ansible touch ${HOME}/.ssh/authorized_keys
-sudo -u ansible chmod 600 ${HOME}/.ssh/authorized_keys
+sudo -u ansible mkdir ${ANSIBLE_HOME}/.ssh
+sudo -u ansible chmod 700 ${ANSIBLE_HOME}/.ssh
+sudo -u ansible touch ${ANSIBLE_HOME}/.ssh/authorized_keys
+sudo -u ansible chmod 600 ${ANSIBLE_HOME}/.ssh/authorized_keys
 END
 
 $script3 = <<END

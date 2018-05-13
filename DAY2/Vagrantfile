@@ -84,9 +84,9 @@ sudo echo "ansible" > passtemp.txt
 sudo python -c "import crypt, getpass, pwd; print crypt.crypt('`cat passtemp.txt`','\$6\$salt1234\$')" > passtemp.txt
 sudo useradd -p `cat passtemp.txt` ansible
 sudo -u ansible mkdir ${ANSIBLE_HOME}/.ssh
-sudo -u ansible chmod 700 ${ANSIBLE_HOME}/.ssh
+# sudo -u ansible chmod 700 ${ANSIBLE_HOME}/.ssh
 sudo -u ansible touch ${ANSIBLE_HOME}/.ssh/authorized_keys
-sudo -u ansible chmod 600 ${ANSIBLE_HOME}/.ssh/authorized_keys
+# sudo -u ansible chmod 600 ${ANSIBLE_HOME}/.ssh/authorized_keys
 END
 
 $script3 = <<END

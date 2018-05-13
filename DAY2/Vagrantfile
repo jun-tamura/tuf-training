@@ -80,8 +80,8 @@ systemctl restart sshd
 
 ### ansibleユーザ作成&SSHキー設定
 ANSIBLE_HOME=/home/ansible
-echo "ansible" > passtemp.txt
-python -c "import crypt, getpass, pwd; print crypt.crypt('`cat passtemp.txt`','\$6\$salt1234\$')" > passtemp.txt
+sudo echo "ansible" > passtemp.txt
+sudo python -c "import crypt, getpass, pwd; print crypt.crypt('`cat passtemp.txt`','\$6\$salt1234\$')" > passtemp.txt
 sudo useradd -p `cat passtemp.txt` ansible
 sudo -u ansible mkdir ${ANSIBLE_HOME}/.ssh
 sudo -u ansible chmod 700 ${ANSIBLE_HOME}/.ssh

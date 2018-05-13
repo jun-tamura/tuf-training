@@ -1,0 +1,157 @@
+Vagrant.configure(2) do |config|
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.vm.provider "virtualbox" do |vb|
+    vb.customize ["modifyvm", :id, "--memory", "512"]
+  end
+
+  config.vm.define "master" do |node|
+    node.vm.box = "centos/7"
+    node.vm.hostname = "master"
+    node.vm.network :private_network, ip: "192.168.33.200", auto_config:true
+    node.vm.network :forwarded_port, id: "ssh", guest: 22, host: 2210
+    node.vm.provision "shell", inline: $script1
+    node.vm.provision "shell", inline: $script2
+  end
+  config.vm.define "slave" do |node|
+    node.vm.box = "centos/7"
+    node.vm.hostname = "slave"
+    node.vm.network :private_network, ip: "192.168.33.201", auto_config:true
+    node.vm.network :forwarded_port, id: "ssh", guest: 22, host: 2220
+    node.vm.provision "shell", inline: $script1
+    node.vm.provision "shell", inline: $script3
+  end
+  config.vm.define "web" do |node|
+    node.vm.box = "centos/7"
+    node.vm.hostname = "web"
+    node.vm.network :private_network, ip: "192.168.33.210", auto_config:true
+    node.vm.network :forwarded_port, id: "ssh", guest: 22, host: 2230
+    node.vm.provision "shell", inline: $script1
+    node.vm.provision "shell", inline: $script4
+    node.vm.provision "shell", inline: $script5
+  end
+  config.vm.define "db" do |node|
+    node.vm.box = "centos/7"
+    node.vm.hostname = "db"
+    node.vm.network :private_network, ip: "192.168.33.211", auto_config:true
+    node.vm.network :forwarded_port, id: "ssh", guest: 22, host: 2240
+    node.vm.provision "shell", inline: $script1
+    node.vm.provision "shell", inline: $script4
+  end
+end
+
+$script1 = <<END
+### IP割当修正
+HOSTNAME=`uname -n`
+MASTER=192.168.33.200
+SLAVE=192.168.33.201
+WEB=192.168.33.210
+DB=192.168.33.211
+sudo systemctl restart network.service
+sudo ip a | grep "192.168.33"
+ret=$?
+if [ ${ret} -ne 0 ]; then
+    echo "### IP割当てが失敗しました ###"
+    echo "### 再割当て処理を開始します ###"
+    echo ""
+    IFCFG="/etc/sysconfig/network-scripts/"
+    echo "NM_CONTROLLED=yes" > ${IFCFG}ifcfg-eth1
+    echo "BOOTPROTO=none" >> ${IFCFG}ifcfg-eth1
+    echo "ONBOOT=yes" >> ${IFCFG}ifcfg-eth1
+    if [ "$HOSTNAME" = "master" ]; then
+        echo "IPADDR=${MASTER}" >> ${IFCFG}ifcfg-eth1
+    elif [ "$HOSTNAME" = "web" ]; then
+        echo "IPADDR=${WEB}" >> ${IFCFG}ifcfg-eth1
+    elif [ "$HOSTNAME" = "db" ]; then
+        echo "IPADDR=${DB}" >> ${IFCFG}ifcfg-eth1
+    fi
+    echo "NETMASK=255.255.255.0" >> ${IFCFG}ifcfg-eth1
+    echo "DEVICE=eth1" >> ${IFCFG}ifcfg-eth1
+    echo "PEERDNS=no" >> ${IFCFG}ifcfg-eth1
+    sudo systemctl restart network.service
+    sudo ip a | grep "192.168.33"
+    ret=$?
+    if [ ${ret} -ne 0 ]; then
+        echo "### IP再割当ても失敗しました ###"
+    elif [ ${ret} -eq 0 ]; then
+        echo "### IP再割当てが成功しました ###"
+    fi
+elif [ ${ret} -eq 0 ]; then
+    echo "### IP割当てが成功しました ###"
+fi
+END
+
+$script2 = <<END
+### 言語設定修正
+sudo localectl set-locale LANG=en_US.utf8
+export LANG=en_US.utf8
+
+### タイムゾーン設定
+sudo timedatectl set-timezone Asia/Tokyo
+
+### 参照DNS設定
+sudo sed -i '2a nameserver 8.8.8.8' /etc/resolv.conf
+
+### Javaインストール
+sudo yum install -y java-1.8.0-openjdk  java-1.8.0-openjdk-devel
+
+### Git, initscript, wgetインストール
+
+### Jenkinsインストール
+sudo yum install -y git initscripts wget
+sudo wget -O /etc/yum.repos.d/jenkins.repo http://pkg.jenkins-ci.org/redhat/jenkins.repo
+sudo rpm --import http://pkg.jenkins-ci.org/redhat/jenkins-ci.org.key
+sudo yum install -y jenkins
+sudo sed -i 's/gpgcheck=0/gpgcheck=1/' /etc/yum.repos.d/jenkins.repo
+sudo sed -i 's%jenkins:/bin/false%jenkins:/bin/bash%' /etc/passwd
+
+### jenkins起動
+sudo chkconfig jenkins on
+sudo systemctl start jenkins
+
+### ansibleインストール
+sudo rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+sudo yum -y install ansible
+END
+
+$script3 = <<END
+### 言語設定修正
+sudo localectl set-locale LANG=en_US.utf8
+export LANG=en_US.utf8
+
+### タイムゾーン設定
+sudo timedatectl set-timezone Asia/Tokyo
+
+### 参照DNS設定
+sudo sed -i '2a nameserver 8.8.8.8' /etc/resolv.conf
+
+### Javaインストール
+sudo yum install -y java-1.8.0-openjdk  java-1.8.0-openjdk-devel
+
+### Gitインストール
+sudo yum install -y git
+
+### SSHパスワード認証有効化
+sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+systemctl restart sshd
+END
+
+$script4 = <<END
+### 言語設定修正
+sudo localectl set-locale LANG=en_US.utf8
+export LANG=en_US.utf8
+
+### タイムゾーン設定
+sudo timedatectl set-timezone Asia/Tokyo
+
+### 参照DNS設定
+sudo sed -i '2a nameserver 8.8.8.8' /etc/resolv.conf
+
+### SSHパスワード認証有効化
+sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+systemctl restart sshd
+END
+
+$script5 = <<END
+### firewall起動
+sudo systemctl start firewalld
+END

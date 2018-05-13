@@ -1,4 +1,18 @@
 Vagrant.configure(2) do |config|
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.vm.provider "virtualbox" do |vb|
+    vb.customize ["modifyvm", :id, "--memory", "512"]
+  end
+
+  config.vm.define "controller" do |node|
+        node.vm.box = "centos/7"
+        node.vm.hostname = "controller"
+        node.vm.network :private_network, ip: "192.168.33.11"
+        node.vm.network :forwarded_port, id: "ssh", guest: 22, host: 2210
+        node.vm.provision "shell", inline: $script1
+        node.vm.provision "shell", inline: $script2
+        node.vm.provision "shell", inline: $script3
+  end
   config.vm.define "target1" do |node|
         node.vm.box = "centos/7"
         node.vm.hostname = "target1"
@@ -14,15 +28,6 @@ Vagrant.configure(2) do |config|
         node.vm.network :forwarded_port, id: "ssh", guest: 22, host: 2230
         node.vm.provision "shell", inline: $script1
         node.vm.provision "shell", inline: $script2
-  end
-  config.vm.define "controller" do |node|
-        node.vm.box = "centos/7"
-        node.vm.hostname = "controller"
-        node.vm.network :private_network, ip: "192.168.33.11"
-        node.vm.network :forwarded_port, id: "ssh", guest: 22, host: 2210
-        node.vm.provision "shell", inline: $script1
-        node.vm.provision "shell", inline: $script2
-        node.vm.provision "shell", inline: $script3
   end
 end
 

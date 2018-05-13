@@ -4,17 +4,94 @@ Vagrant.configure(2) do |config|
         node.vm.hostname = "controller"
         node.vm.network :private_network, ip: "192.168.33.11"
         node.vm.network :forwarded_port, id: "ssh", guest: 22, host: 2210
+        node.vm.provision "shell", inline: $script1
+        node.vm.provision "shell", inline: $script2
+        node.vm.provision "shell", inline: $script3
   end
   config.vm.define "target1" do |node|
         node.vm.box = "centos/7"
         node.vm.hostname = "target1"
         node.vm.network :private_network, ip: "192.168.33.20"
         node.vm.network :forwarded_port, id: "ssh", guest: 22, host: 2220
+        node.vm.provision "shell", inline: $script1
+        node.vm.provision "shell", inline: $script2
   end
  config.vm.define "target2" do |node|
         node.vm.box = "centos/7"
         node.vm.hostname = "target2"
         node.vm.network :private_network, ip: "192.168.33.21"
         node.vm.network :forwarded_port, id: "ssh", guest: 22, host: 2230
+        node.vm.provision "shell", inline: $script1
+        node.vm.provision "shell", inline: $script2
   end
 end
+
+$script1 = <<END
+### IP割当修正
+HOSTNAME=`uname -n`
+CONTROLLER=192.168.33.11
+WEB=192.168.33.20
+DB=192.168.33.21
+sudo systemctl restart network.service
+sudo ip a | grep "192.168.33"
+ret=$?
+if [ ${ret} -ne 0 ]; then
+    echo "### IP割当てが失敗しました ###"
+    echo "### 再割当て処理を開始します ###"
+    echo ""
+    IFCFG="/etc/sysconfig/network-scripts/"
+    echo "NM_CONTROLLED=yes" > ${IFCFG}ifcfg-eth1
+    echo "BOOTPROTO=none" >> ${IFCFG}ifcfg-eth1
+    echo "ONBOOT=yes" >> ${IFCFG}ifcfg-eth1
+    if [ "$HOSTNAME" = "controller" ]; then
+        echo "IPADDR=${CONTROLLER}" >> ${IFCFG}ifcfg-eth1
+    elif [ "$HOSTNAME" = "web" ]; then
+        echo "IPADDR=${WEB}" >> ${IFCFG}ifcfg-eth1
+    elif [ "$HOSTNAME" = "db" ]; then
+        echo "IPADDR=${DB}" >> ${IFCFG}ifcfg-eth1
+    fi
+    echo "NETMASK=255.255.255.0" >> ${IFCFG}ifcfg-eth1
+    echo "DEVICE=eth1" >> ${IFCFG}ifcfg-eth1
+    echo "PEERDNS=no" >> ${IFCFG}ifcfg-eth1
+    sudo systemctl restart network.service
+    sudo ip a | grep "192.168.33"
+    ret=$?
+    if [ ${ret} -ne 0 ]; then
+        echo "### IP再割当ても失敗しました ###"
+    elif [ ${ret} -eq 0 ]; then
+        echo "### IP再割当てが成功しました ###"
+    fi
+elif [ ${ret} -eq 0 ]; then
+    echo "### IP割当てが成功しました ###"
+fi
+END
+
+$script2 = <<END
+### 言語設定修正
+sudo localectl set-locale LANG=en_US.utf8
+export LANG=en_US.utf8
+
+### タイムゾーン設定
+sudo timedatectl set-timezone Asia/Tokyo
+
+### SSH Config設定
+sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+systemctl restart sshd
+
+### ansibleユーザ作成&SSHキー設定
+echo "ansible" > passtemp.txt
+sudo useradd -p `cat passtemp.txt | mkpasswd -s -m sha-512` ansible
+sudo -u ansible mkdir ${HOME}/.ssh
+sudo -u ansible chmod 700 ${HOME}/.ssh
+sudo -u ansible touch ${HOME}/.ssh/authorized_keys
+sudo -u ansible chmod 600 ${HOME}/.ssh/authorized_keys
+END
+
+$script3 = <<END
+### SSH秘密鍵生成
+sudo -u ansible ssh-keygen -N ansible
+
+### ansibleインストール
+sudo yum -y install ansible
+END
+
